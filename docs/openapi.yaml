@@ -1,0 +1,89 @@
+openapi: 3.0.3
+info:
+  title: Oficina - Autenticacao CPF
+  version: 1.0.0
+  description: Emissao de JWT de cliente. Integracao com as rotas da API principal ainda pendente.
+servers:
+  - url: http://127.0.0.1:5081
+    description: Host local; sem deploy AWS nesta etapa
+paths:
+  /auth/cpf:
+    post:
+      summary: Autenticar cliente ativo pelo CPF
+      operationId: autenticarCpf
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cpf]
+              properties:
+                cpf:
+                  type: string
+                  example: '529.982.247-25'
+      responses:
+        '200':
+          description: JWT RS256 emitido
+          headers:
+            X-Correlation-ID:
+              schema: { type: string }
+              description: Identificador para correlacao dos logs
+            Cache-Control:
+              schema: { type: string, example: no-store }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accessToken, tokenType, expiresIn]
+                properties:
+                  accessToken: { type: string }
+                  tokenType: { type: string, enum: [Bearer] }
+                  expiresIn: { type: integer, minimum: 60, maximum: 900, example: 900 }
+        '400': { description: JSON ou CPF invalido }
+        '401': { description: Cliente nao autorizado }
+        '413': { description: Corpo excede limite do host local }
+        '500': { description: Falha inesperada sem detalhes internos }
+        '503': { description: Autenticacao temporariamente indisponivel }
+  /.well-known/jwks.json:
+    get:
+      summary: Consultar chave publica RSA
+      operationId: consultarJwks
+      responses:
+        '200':
+          description: JWKS publico sem componentes privados
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [keys]
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      type: object
+                      required: [kty, use, alg, kid, n, e]
+                      properties:
+                        kty: { type: string, enum: [RSA] }
+                        use: { type: string, enum: [sig] }
+                        alg: { type: string, enum: [RS256] }
+                        kid: { type: string }
+                        n: { type: string }
+                        e: { type: string }
+        '503': { description: Configuracao da funcao indisponivel }
+  /.well-known/openid-configuration:
+    get:
+      summary: Consultar metadados minimos do emissor JWT
+      operationId: consultarEmissor
+      responses:
+        '200':
+          description: Descoberta de issuer e JWKS; nao implementa todos os fluxos OIDC
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [issuer, jwks_uri]
+                properties:
+                  issuer: { type: string, format: uri }
+                  jwks_uri: { type: string, format: uri }
+        '503': { description: Configuracao da funcao indisponivel }

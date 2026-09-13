@@ -1,7 +1,6 @@
 namespace Oficina.Autenticacao;
 
 // Caso de uso independente do transporte Lambda/API Gateway.
-// Os adaptadores reais de consulta e assinatura serao implementados em outra etapa.
 public sealed class AutenticarCliente(IClienteConsulta clientes, IEmissorToken tokens)
 {
     public async Task<TokenAcesso> ExecutarAsync(string? cpf, CancellationToken cancellationToken = default)
