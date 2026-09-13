@@ -1,12 +1,8 @@
 {
-  "Environment": "staging",
-  "PlannedSettings": {
-    "AwsRegion": "us-east-1",
-    "ClientDatabaseSecretArn": "<ARN a definir na etapa AWS>",
-    "JwtSigningKeySecretArn": "<ARN a definir na etapa AWS>",
-    "JwtIssuer": "https://auth.example.com",
-    "JwtAudience": "oficina-api",
-    "TokenLifetimeMinutes": 15,
-    "NotificationSender": "oficina@example.com"
-  }
+  "DB_CONNECTION_STRING": "Host=localhost;Port=5432;Database=oficina;Username=oficina_auth;Password=<configurar-fora-do-git>",
+  "JWT_PRIVATE_KEY_FILE": "<caminho-absoluto-do-arquivo-PEM-privado>",
+  "JWT_ISSUER": "http://127.0.0.1:5081",
+  "JWT_AUDIENCE": "oficina-api",
+  "JWT_KEY_ID": "local-2026-01",
+  "JWT_LIFETIME_SECONDS": "900"
 }
