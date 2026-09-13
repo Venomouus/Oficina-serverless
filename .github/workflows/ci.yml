@@ -1,0 +1,56 @@
+name: CI - Serverless
+
+on:
+  push:
+    branches: [develop, master]
+  pull_request:
+    branches: [develop, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore
+        run: dotnet restore Oficina.Serverless.sln
+      - name: Build
+        run: dotnet build Oficina.Serverless.sln --configuration Release --no-restore
+      - name: Test
+        run: dotnet test Oficina.Serverless.sln --configuration Release --no-build --logger trx --results-directory TestResults
+      - name: Save test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: serverless-test-results
+          path: TestResults/*.trx
+          if-no-files-found: ignore
+
+  validate-terraform:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.15.8'
+      - name: Check formatting
+        run: terraform fmt -check -recursive
+      - name: Initialize without remote backend
+        run: terraform init -backend=false -input=false
+      - name: Validate configuration
+        run: terraform validate -no-color
