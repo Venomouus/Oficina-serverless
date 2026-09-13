@@ -10,6 +10,6 @@ public interface IClienteConsulta
 
 public interface IEmissorToken
 {
-    // O adaptador futuro deve emitir JWT assinado, com sub, role, iss, aud e exp.
+    // Emite token para o identificador retornado pela base, nunca para o CPF informado.
     Task<TokenAcesso> EmitirAsync(Guid clienteId, CancellationToken cancellationToken);
 }

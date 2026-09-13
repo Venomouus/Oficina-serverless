@@ -12,6 +12,8 @@ artifacts/
 .env.*
 !.env.example
 config/*.local.json
+*.pem
+*.key
 .terraform/
 *.tfstate
 *.tfstate.*

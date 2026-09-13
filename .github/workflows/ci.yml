@@ -14,6 +14,20 @@ jobs:
   build-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: oficina_auth_tests
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres-tests-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d oficina_auth_tests"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      OFICINA_TEST_POSTGRES: Host=localhost;Port=5432;Database=oficina_auth_tests;Username=postgres;Password=postgres-tests-only
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,6 +48,17 @@ jobs:
           name: serverless-test-results
           path: TestResults/*.trx
           if-no-files-found: ignore
+      - name: Publish Lambda package
+        run: |
+          dotnet publish src/Oficina.Autenticacao/Oficina.Autenticacao.csproj --configuration Release --runtime linux-x64 --self-contained false --output artifacts/auth
+          cd artifacts/auth
+          zip -r ../oficina-autenticacao.zip .
+      - name: Save Lambda package
+        uses: actions/upload-artifact@v4
+        with:
+          name: oficina-autenticacao-lambda
+          path: artifacts/oficina-autenticacao.zip
+          if-no-files-found: error
 
   validate-terraform:
     runs-on: ubuntu-latest
