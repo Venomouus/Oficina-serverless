@@ -1,0 +1,12 @@
+{
+  "Environment": "staging",
+  "PlannedSettings": {
+    "AwsRegion": "us-east-1",
+    "ClientDatabaseSecretArn": "<ARN a definir na etapa AWS>",
+    "JwtSigningKeySecretArn": "<ARN a definir na etapa AWS>",
+    "JwtIssuer": "https://auth.example.com",
+    "JwtAudience": "oficina-api",
+    "TokenLifetimeMinutes": 15,
+    "NotificationSender": "oficina@example.com"
+  }
+}
