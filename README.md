@@ -1,187 +1,100 @@
 # Oficina Serverless
 
-Autenticacao por CPF e base de notificacoes de ordens de servico do Tech Challenge.
-A aplicacao principal permanece em [Oficina-Mecanica](https://github.com/Venomouus/Oficina-Mecanica).
+Autenticacao por CPF com PostgreSQL e JWT RS256, host local de testes e infraestrutura da Lambda na AWS. A API principal permanece em Oficina-Mecanica.
 
-## Implementado
+## Entrega atual
 
-- Validacao do CPF, consulta parametrizada PostgreSQL e verificacao de cliente ativo.
-- JWT RS256 com identificador do cliente, perfil `Cliente`, audiencia e validade de 15 minutos.
-- Handler Lambda para API Gateway **HTTP API, payload 2.0**.
-- Chave publica JWKS, metadados do emissor e logs JSON com correlacao, sem CPF/token.
-- Host HTTP local com Swagger para testar a mesma autenticacao sem AWS.
-- Testes de dominio, assinatura/verificacao JWT, eventos Lambda e PostgreSQL real.
-- CI com PostgreSQL temporario e artefato ZIP da Lambda; validacao da base Terraform.
+- Consulta parametrizada de cliente existente/ativo e emissao de token de cliente com validade de ate 15 minutos.
+- Handler HTTP API v2: autenticacao, discovery do emissor e JWKS publico.
+- Modo local com Swagger e chave RSA em arquivo, preservado.
+- Modo AWS com dois segredos por ambiente: credencial PostgreSQL da role auth e chave privada JWT.
+- Terraform da Lambda privada, IAM, Secrets Manager (containers sem valores), logs, tracing da Lambda, alias e permissao restrita de invocacao pelo Gateway.
+- Contratos de rede/RDS, verificacao de duas AZs, rotas NAT e separacao staging/producao.
+- 72 testes .NET, incluindo PostgreSQL real descartavel, e 11 testes Terraform com AWS simulada.
+- CI gera ZIP linux-x64 incluindo o bundle publico de CA do RDS e o SDK Secrets Manager.
 
-Ainda pendentes: recursos AWS/Terraform, leitura de segredos via Secrets Manager,
-rotacao de chaves, limitacao de tentativas no Gateway, traces distribuidos e CD
-automatico dos ambientes. Notificacoes ainda possuem somente caso de uso e testes.
-O JWT de cliente **ainda nao e aceito pela API principal**, que usa outra assinatura:
-a validacao RSA, os papeis e a verificacao de propriedade da OS serao integrados nela.
+**Nenhum recurso AWS foi provisionado nesta etapa.** A CI valida e empacota; mantenha `DEPLOY_ENABLED=false`. O fluxo local de emissao JWT e autorizacao por cliente na API principal ja foi integrado e testado.
 
-## Tecnologias e estrutura
-
-C#, .NET 8, Npgsql 8, Microsoft IdentityModel, AWS Lambda SDK, xUnit,
-PostgreSQL 16 para testes, Terraform e GitHub Actions.
-
-```text
-src/Oficina.Autenticacao/       # Caso de uso, PostgreSQL, RSA, HTTP e handler Lambda
-src/Oficina.Autenticacao.Local/ # Host HTTP/Swagger e geracao de chave local
-src/Oficina.Notificacoes/      # Base do caso de uso; envio real ainda pendente
-tests/Oficina.Serverless.Tests/
-scripts/test-postgres.ps1      # Testes em container descartavel
-infra/                        # Base Terraform; ainda nao provisiona AWS
-config/serverless.example.json
-docs/contratos.md
-docs/openapi.yaml
-docs/adrs/001-autenticacao-cpf-rsa.md
-```
-
-## Arquitetura deste repositorio
-
-```mermaid
-flowchart LR
-    Local[Host local / Swagger] --> HTTP[Adaptador HTTP]
-    Gateway[API Gateway HTTP API - futuro] --> Lambda[Handler Lambda v2]
-    Lambda --> HTTP
-    HTTP --> Auth[AutenticarCliente]
-    Auth --> CPF[Validacao CPF]
-    Auth --> Consulta[PostgresClienteConsulta]
-    Consulta --> DB[(PostgreSQL / futuro RDS)]
-    Auth --> RSA[Assinatura RSA RS256]
-    RSA --> JWT[JWT de cliente]
-    HTTP --> JWKS[JWKS publico e metadados]
-    HTTP --> Logs[Logs JSON com correlationId]
-```
+Ainda faltam provisionamento, bootstrap dos bancos/roles/valores dos segredos, Gateway HTTPS e authorizer, publicacao da API no EKS, CD, notificacoes e observabilidade distribuida. A rotacao RSA com coexistencia de chaves JWKS tambem permanece pendente.
 
 ## Executar localmente
 
-Use SDK .NET 8. O banco deve conter a tabela `Clientes` da API, incluindo `Ativo`
-(migration `20260913192237_AddClienteAtivoHistoricoStatus`). Este repositorio nao
-executa migrations e nao cria clientes no banco da aplicacao.
+Requer .NET 8 e PostgreSQL com o schema da API, incluindo `Clientes.Ativo`. Este repositorio nao executa migrations.
 
-No PowerShell, na raiz deste repositorio:
+No PowerShell, na raiz:
 
 ```powershell
 dotnet restore Oficina.Serverless.sln
 $chaveLocal = Join-Path (Get-Location) 'config/auth.local.pem'
-dotnet run --project src/Oficina.Autenticacao.Local -- --generate-dev-key $chaveLocal
-
-# Conexao EXCLUSIVA de desenvolvimento; ajuste para o seu PostgreSQL local.
+if (!(Test-Path -LiteralPath $chaveLocal)) {
+    dotnet run --project src/Oficina.Autenticacao.Local -- --generate-dev-key $chaveLocal
+}
 $env:DB_CONNECTION_STRING = 'Host=localhost;Port=5432;Database=oficina;Username=postgres;Password=postgres'
 $env:JWT_PRIVATE_KEY_FILE = $chaveLocal
 $env:JWT_ISSUER = 'http://127.0.0.1:5081'
 $env:JWT_AUDIENCE = 'oficina-api'
 $env:JWT_KEY_ID = 'local-2026-01'
 $env:JWT_LIFETIME_SECONDS = '900'
-dotnet run --project src/Oficina.Autenticacao.Local
+$env:ASPNETCORE_URLS = 'http://127.0.0.1:5081'
+dotnet run --project src/Oficina.Autenticacao.Local --no-launch-profile
 ```
 
-A chave e gerada uma unica vez; o comando recusa sobrescrever arquivo existente.
-Arquivos `.pem`/`.key` estao ignorados no Git. Nunca inclua a chave privada no ZIP.
+Abra http://127.0.0.1:5081/swagger. Configure apenas uma fonte de PEM local, por arquivo ou `JWT_PRIVATE_KEY_PEM`. Use um terminal sem variaveis `DB_SECRET_ARN`, `JWT_SECRET_ARN` ou contexto Lambda. Os exemplos de senha e HTTP sao exclusivos do ambiente local.
 
-Abra **http://127.0.0.1:5081/swagger** e teste `POST /auth/cpf` com um CPF de cliente
-ativo ja cadastrado. CPF valido nao cadastrado e cliente inativo retornam o mesmo 401.
-Issuer/audience devem corresponder aos futuros validadores da API e do Gateway.
-HTTP no issuer e permitido somente em loopback para desenvolvimento.
+A chave privada local continua ignorada pelo Git. A unica excecao PEM versionada e `src/Oficina.Autenticacao/certificates/rds-global-bundle.pem`, que contem certificados publicos da AWS, sem chave privada.
 
-## Configuracao
+## Configuracao AWS
 
-As configuracoes sao lidas de variaveis de ambiente; o JSON de exemplo e apenas
-referencia, nao e carregado automaticamente. Nao ha padrao para conexao ou chave.
+O modo AWS e selecionado pelo contexto Lambda ou pela presenca de um ARN de segredo. Fontes locais de conexao/chave e `JWT_KEY_ID` sao rejeitadas nesse modo; nao existe fallback silencioso.
 
-| Variavel | Uso |
+| Variavel | Conteudo |
 |---|---|
-| `DB_CONNECTION_STRING` | Conexao PostgreSQL, preferencialmente com usuario de leitura |
-| `JWT_PRIVATE_KEY_FILE` | Arquivo PEM privado RSA com pelo menos 2048 bits |
-| `JWT_PRIVATE_KEY_PEM` | Alternativa ao arquivo; PEM com quebras de linha reais |
-| `JWT_ISSUER` | URL HTTPS publica sem barra final; HTTP apenas local |
-| `JWT_AUDIENCE` | Audiencia destinada a API, exemplo `oficina-api` |
-| `JWT_KEY_ID` | Identificador publico da chave (`kid`) |
-| `JWT_LIFETIME_SECONDS` | 60 a 900 segundos; padrao 900 |
-| `ASPNETCORE_URLS` | Host local; padrao `http://127.0.0.1:5081` |
+| DB_SECRET_ARN | ARN do segredo com username/password da role auth do ambiente |
+| JWT_SECRET_ARN | ARN do segredo com keyId/privateKeyPem |
+| DB_HOST / DB_NAME / DB_USERNAME | Destino e usuario esperados, vindos do contrato do RDS |
+| DB_SSL_ROOT_CERTIFICATE | Bundle publico RDS, no ZIP em /var/task/certificates/rds-global-bundle.pem |
+| JWT_ISSUER / JWT_AUDIENCE | URL HTTPS publica do emissor e audiencia configurada na API |
+| JWT_LIFETIME_SECONDS | Validade de 60 a 900 segundos |
+| CONFIGURATION_REVISION | Revisao publica para publicar nova versao apos mudancas de segredos |
 
-Configure apenas uma fonte de chave. A configuracao e carregada uma vez por ambiente
-de execucao Lambda. Corrigir configuracao invalida exige reiniciar/atualizar a funcao.
-Discovery/JWKS nao consultam o banco, mas dependem da inicializacao da configuracao.
+O SDK usa a role de execucao Lambda para ler somente AWSCURRENT dos dois segredos. O usuario do JSON deve coincidir com DB_USERNAME. Host/banco nao sao lidos do segredo. Npgsql usa VerifyFull, validando CA e hostname, pool de ate cinco conexoes e timeouts de cinco segundos.
 
-Na AWS, a conexao RDS devera verificar TLS (`SSL Mode=VerifyFull`), usar rede privada
-e credenciais com permissao minima. Um administrador pode conceder ao usuario
-previamente criado `oficina_auth` somente as colunas necessarias:
+A configuracao bem-sucedida fica em memoria por ambiente de execucao. Falha de inicializacao retorna 503 sem revelar detalhes e permite nova tentativa. A leitura dos segredos compartilha o limite de tempo da invocacao. Discovery/JWKS nao consultam o PostgreSQL, mas em um cold start precisam carregar a configuracao dos segredos.
 
-```sql
-GRANT CONNECT ON DATABASE oficina TO oficina_auth;
-GRANT USAGE ON SCHEMA public TO oficina_auth;
-GRANT SELECT ("Id", "CpfCnpj", "Ativo") ON TABLE public."Clientes" TO oficina_auth;
-```
+Atualizar um segredo nao atualiza automaticamente os caches. Leia [operacao e rotacao](infra/README.md) antes de substituir chaves ou senhas.
 
-Esse usuario nao deve herdar permissoes de escrita. O adaptador executa apenas SELECT,
-sem EF/migrations, com comando de ate 5 segundos e pool de ate 5 conexoes por instancia.
-O limite global de conexoes dependera da concorrencia Lambda/RDS na etapa AWS.
+## Testes e pacote
 
-## Testes
-
-```powershell
-dotnet test Oficina.Serverless.sln --configuration Release
-```
-
-Sem `OFICINA_TEST_POSTGRES`, dois testes PostgreSQL aparecem explicitamente como
-ignorados. Para executar **todos** em banco descartavel com Docker aberto:
+Com Docker aberto, execute todos os testes em banco temporario:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/test-postgres.ps1
 ```
 
-O script cria seu proprio container e porta local, executa os testes e remove apenas
-esse container. Nao usa o banco da API. Os testes SQL criam schemas exclusivos dentro
-de um banco `oficina_auth_test*`; nunca aponte a variavel para dados de producao.
-No CI, PostgreSQL e disponibilizado automaticamente e os dois testes sao executados.
+O script cria e remove somente seu proprio container. Sem Docker, `dotnet test Oficina.Serverless.sln --configuration Release` executa os testes unitarios e marca dois testes PostgreSQL como ignorados quando OFICINA_TEST_POSTGRES nao esta definida.
 
-## Lambda e pacote
+Terraform, sem credenciais AWS:
 
-Handler: `Oficina.Autenticacao::Oficina.Autenticacao.Function::FunctionHandler`.
-Runtime planejado: `dotnet8`, arquitetura `x86_64`, integracao proxy HTTP API v2.
-Um unico handler atende `/auth/cpf`, `/.well-known/openid-configuration` e
-`/.well-known/jwks.json`. Essas tres rotas serao publicas no Gateway; as rotas da
-API principal exigirao JWT e autorizacao por cliente.
+```powershell
+terraform -chdir=infra fmt -check -recursive
+terraform -chdir=infra init -backend=false -input=false -lockfile=readonly
+terraform -chdir=infra validate -no-color
+terraform -chdir=infra test -no-color
+```
+
+Geracao do pacote de deploy:
 
 ```powershell
 dotnet publish src/Oficina.Autenticacao/Oficina.Autenticacao.csproj --configuration Release --runtime linux-x64 --self-contained false --output artifacts/auth
 Compress-Archive -Path artifacts/auth/* -DestinationPath artifacts/oficina-autenticacao.zip -Force
 ```
 
-O ZIP deve conter DLL, dependencias, `.deps.json` e `.runtimeconfig.json` na raiz.
-A chave e a conexao nao fazem parte do pacote. Este deploy usa ZIP, portanto nao
-precisa de Dockerfile Lambda. O host local nao e incluido no pacote da funcao.
+DLLs, deps/runtimeconfig e certificates devem estar na raiz adequada do ZIP. Nunca incluir `config/auth.local.pem`, arquivos de segredos ou o host Swagger. O ZIP vazio em infra/tests/fixtures serve apenas ao teste Terraform simulado.
 
-## CI/CD e ambientes
+## Git e proximas integracoes
 
-Fluxo: `feature/* -> PR develop -> PR master`. Checks obrigatorios existentes:
+Checks: `build-test` e `validate-terraform`. Fluxo: feature → develop → master. Infraestrutura serverless tem state separado por ambiente, ao contrario dos states compartilhados de rede e RDS.
 
-- `build-test`: build, testes (incluindo PostgreSQL), TRX e pacote ZIP da Lambda.
-- `validate-terraform`: fmt, init sem backend e validate.
+O infra-kubernetes continua responsavel pelo Gateway e suas integracoes. Este repositorio fornece alias ARN/invoke ARN e configura permissao somente quando receber o execution ARN especifico da API. Ainda nao ha URL AWS ativa.
 
-O job salva `oficina-autenticacao-lambda` como artefato; ainda nao faz deploy.
-Mantenha **`DEPLOY_ENABLED=false`**. Terraform atual nao provisiona recursos;
-alterar essa variavel agora nao habilita um CD que ainda nao foi implementado.
-
-| Ambiente GitHub | Branch |
-|---|---|
-| staging | develop |
-| producao | master |
-
-Para concluir a etapa AWS: rede/RDS, segredos, Terraform da Lambda, publicacao HTTPS
-do emissor/JWKS, authorizer do Gateway, OIDC do GitHub e CD automatico nos dois
-ambientes. Integrar validacao e autorizacao do cliente na API principal.
-[Responsabilidades Terraform](infra/README.md).
-
-## Documentacao e repositorios
-
-- [Contrato HTTP e notificacoes](docs/contratos.md).
-- [OpenAPI da autenticacao](docs/openapi.yaml).
-- [ADR: CPF, RSA e integracao com a API](docs/adrs/001-autenticacao-cpf-rsa.md).
-- [Aplicacao e Swagger](https://github.com/Venomouus/Oficina-Mecanica#collection--swagger).
-- [Infra Kubernetes](https://github.com/Venomouus/Oficina-infra-kubernetes).
-- [Infra database](https://github.com/Venomouus/Oficina-infra-database).
-
-Nao ha URL de deploy AWS ativa nesta etapa.
+Referencias do projeto: [contratos HTTP](docs/contratos.md), [OpenAPI](docs/openapi.yaml), [operacao Terraform](infra/README.md), [ADR AWS](docs/adrs/002-lambda-secrets-manager.md).

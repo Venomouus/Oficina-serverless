@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Oficina - Autenticacao CPF
   version: 1.0.0
-  description: Emissao de JWT de cliente. Integracao com as rotas da API principal ainda pendente.
+  description: Emissao de JWT de cliente integrado as rotas da API principal. Provisionamento e Gateway AWS pendentes.
 servers:
   - url: http://127.0.0.1:5081
     description: Host local; sem deploy AWS nesta etapa
