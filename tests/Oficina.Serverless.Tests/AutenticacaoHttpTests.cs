@@ -105,6 +105,18 @@ public class AutenticacaoHttpTests : IDisposable
         Assert.DoesNotContain("segredo", response.Body);
     }
 
+    [Fact]
+    public async Task TimeoutDaInicializacaoDeveRetornar503SemExporErro()
+    {
+        var function = new Function(async ct =>
+        {
+            await Task.Delay(Timeout.Infinite, ct);
+            return Http(new Consulta(null));
+        });
+        var response = await function.FunctionHandler(new APIGatewayHttpApiV2ProxyRequest(), new Contexto { Tempo = TimeSpan.FromMilliseconds(260) });
+        Assert.Equal(503, response.StatusCode);
+    }
+
     private AutenticacaoHttp Http(IClienteConsulta consulta) => new(new AutenticarCliente(consulta, _emissor), _emissor, RsaEmissorTokenTests.Options);
     public void Dispose() => _emissor.Dispose();
 
@@ -132,6 +144,7 @@ public class AutenticacaoHttpTests : IDisposable
         public string LogGroupName => "test";
         public string LogStreamName => "test";
         public int MemoryLimitInMB => 256;
-        public TimeSpan RemainingTime => TimeSpan.FromSeconds(30);
+        public TimeSpan Tempo { get; init; } = TimeSpan.FromSeconds(30);
+        public TimeSpan RemainingTime => Tempo;
     }
 }

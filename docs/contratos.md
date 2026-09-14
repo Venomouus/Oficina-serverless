@@ -32,8 +32,9 @@ cadastros distintos, a autenticacao e negada para evitar escolher a pessoa errad
 JWT: `alg=RS256`, `typ=at+jwt`, `kid` configurado; claims `sub` (UUID do cliente),
 `role=Cliente`, `scope=oficina:cliente`, `iss`, `aud`, `iat`, `nbf`, `exp`, `jti`.
 O CPF e a chave privada nao aparecem no token. Validade padrao 900 segundos,
-configuravel entre 60 e 900. Desativar cliente impede novas emissoes; tokens
-anteriores continuam validos ate expirar, salvo futura revogacao/verificacao na API.
+configuravel entre 60 e 900. Desativar cliente impede novas emissoes. A API principal
+tambem verifica cliente ativo ao usar o token; um validador apenas criptografico
+nao detecta desativacao sozinho.
 
 Todas as respostas incluem `X-Correlation-ID`. Na Lambda, o ID vem do contexto
 do API Gateway, com fallback para o ID da invocacao. No host local, vem do servidor.
@@ -51,20 +52,21 @@ A descoberta e minima para validadores JWT; nao implementa login OAuth/OIDC
 completo, authorization code, refresh token nem ID token. A API Gateway recebera
 issuer HTTPS e audience correspondentes, com JWKS acessivel sem autenticacao.
 Configuracao/chave sao carregadas uma vez por instancia, sem geracao automatica
-em cold start. Rotacao com sobreposicao de chaves publicas ainda esta pendente.
+em cold start. Na AWS, discovery/JWKS dependem dessa leitura inicial dos segredos.
+Rotacao com sobreposicao de chaves publicas ainda esta pendente.
 
-## Integracao ainda pendente
+## Integracao com a API e proxima etapa AWS
 
-A API principal usa JWT administrativo simetrico. Este token RSA de cliente nao
-sera aceito antes de configurar um esquema de validacao para esse emissor. Manter
-o acesso administrativo separado; exigir `role=Cliente`, audience/issuer corretos,
-assinatura, validade e escopo nas rotas destinadas ao cliente. A API deve conferir
-`sub == ClienteId` da OS e nao usar um CPF enviado pelo consumidor como autorizacao.
+A API principal ja possui esquema RSA para o cliente, separado do JWT administrativo
+simetrico. As rotas minhas-ordens-servico conferem perfil, token e propriedade
+pela identidade do cliente; o fluxo local foi testado com criacao, aprovacao e
+404 ao consultar OS de outro cliente. A configuracao AWS ainda deve alinhar
+issuer/audience/JWKS do ambiente com o Gateway e com a API.
 
 CPF sozinho identifica cadastro, mas nao comprova posse da identidade. Para o
 fluxo academico, a emissao segue o requisito do desafio; uso real exige fator de
-verificacao adicional. Limitacao de tentativas no Gateway e autorizacao por OS
-tambem fazem parte da proxima integracao, antes de expor o fluxo publicamente.
+verificacao adicional. Limitacao de tentativas no Gateway ainda faz parte da
+proxima integracao, antes de expor o fluxo publicamente.
 
 ## Notificacoes (planejadas)
 

@@ -1,3 +1,4 @@
+using Amazon.SecretsManager;
 using Npgsql;
 
 namespace Oficina.Autenticacao;
@@ -15,26 +16,24 @@ public sealed class AutenticacaoRuntime : IDisposable
         Http = new AutenticacaoHttp(new AutenticarCliente(new PostgresClienteConsulta(dataSource), emissor), emissor, options);
     }
 
-    public static AutenticacaoRuntime FromEnvironment()
+    public static AutenticacaoRuntime FromEnvironment() =>
+        Criar(ConfiguracaoAutenticacao.CarregarAsync(Environment.GetEnvironmentVariable).GetAwaiter().GetResult());
+
+    public static async Task<AutenticacaoRuntime> FromAwsEnvironmentAsync(CancellationToken cancellationToken)
     {
-        static string Required(string name) => Environment.GetEnvironmentVariable(name) is { Length: > 0 } value
-            ? value : throw new InvalidOperationException($"Configuracao obrigatoria ausente: {name}.");
-        var seconds = Environment.GetEnvironmentVariable("JWT_LIFETIME_SECONDS") ?? "900";
-        if (!int.TryParse(seconds, out var lifetime)) throw new InvalidOperationException("JWT_LIFETIME_SECONDS invalido.");
-        var options = new AutenticacaoOptions(Required("JWT_ISSUER"), Required("JWT_AUDIENCE"), Required("JWT_KEY_ID"), lifetime);
-        options.Validar();
-        var pem = Environment.GetEnvironmentVariable("JWT_PRIVATE_KEY_PEM");
-        var file = Environment.GetEnvironmentVariable("JWT_PRIVATE_KEY_FILE");
-        if (!string.IsNullOrEmpty(pem) && !string.IsNullOrEmpty(file))
-            throw new InvalidOperationException("Configure apenas uma fonte de chave RSA.");
-        if (string.IsNullOrWhiteSpace(pem)) pem = File.ReadAllText(Required("JWT_PRIVATE_KEY_FILE"));
-        var connection = new NpgsqlConnectionStringBuilder(Required("DB_CONNECTION_STRING"))
+        using var client = new AmazonSecretsManagerClient(new AmazonSecretsManagerConfig { MaxErrorRetry = 1 });
+        var configuration = await ConfiguracaoAutenticacao.CarregarAsync(
+            Environment.GetEnvironmentVariable, new LeitorSegredosAws(client), cancellationToken);
+        return Criar(configuration);
+    }
+
+    public static AutenticacaoRuntime Criar(ConfiguracaoAutenticacao configuration)
+    {
+        var emissor = new RsaEmissorToken(configuration.PrivateKeyPem, configuration.Options);
+        try
         {
-            MaxPoolSize = 5, Timeout = 5, CommandTimeout = 5, IncludeErrorDetail = false,
-            ApplicationName = "oficina-autenticacao"
-        };
-        var emissor = new RsaEmissorToken(pem, options);
-        try { return new AutenticacaoRuntime(NpgsqlDataSource.Create(connection.ConnectionString), emissor, options); }
+            return new AutenticacaoRuntime(NpgsqlDataSource.Create(configuration.ConnectionString), emissor, configuration.Options);
+        }
         catch { emissor.Dispose(); throw; }
     }
 
