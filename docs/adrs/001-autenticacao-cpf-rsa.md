@@ -18,7 +18,7 @@ caso de uso, permitindo testes sem AWS e sem duplicar regras.
 
 Identificar o cliente pelo UUID da base (`sub`), emitir somente perfil `Cliente`
 e escopo `oficina:cliente`, limitar validade a 15 minutos. Manter o JWT
-administrativo existente separado. A verificacao de propriedade da OS sera feita
+administrativo existente separado. A verificacao de propriedade da OS e feita
 na API, alem da validacao criptografica no Gateway/API.
 
 ## Consequencias e limites
@@ -29,10 +29,11 @@ CPF ausente ou inativo usa o mesmo erro; formatos duplicados na base sao negados
 Usar usuario PostgreSQL com leitura apenas das colunas necessarias e TLS no RDS.
 
 CPF sozinho nao comprova identidade. A demonstracao academica segue o requisito,
-mas uma operacao real exige fator adicional. Tokens ja emitidos nao sao revogados
-imediatamente ao desativar cliente. Limites de tentativas, rotacao com coexistencia
-de JWKS, Secrets Manager e deploy/authorizer AWS serao implementados depois.
-O JWT de cliente ainda nao da acesso a API principal nesta entrega.
+mas uma operacao real exige fator adicional. A API verifica cliente ativo no uso
+do token; validacao criptografica isolada nao detecta desativacao. Limites de
+tentativas, rotacao com coexistencia de JWKS e deploy/authorizer AWS permanecem
+pendentes. A leitura Secrets Manager esta descrita na ADR 002.
+O JWT de cliente ja foi integrado e testado localmente com a API principal.
 
 ## Evidencias e referencias
 

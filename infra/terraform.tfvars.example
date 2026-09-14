@@ -1,2 +1,41 @@
 project_name = "oficina"
 environment  = "staging"
+aws_account_id = "123456789012"
+aws_region = "us-east-1"
+lambda_zip_path = "../artifacts/oficina-autenticacao.zip"
+jwt_issuer = "https://SUBSTITUA.execute-api.us-east-1.amazonaws.com"
+jwt_audience = "oficina-api"
+reserved_concurrency = 2
+api_gateway_execution_arn = null
+
+# Copiar os valores reais do output platform do infra-kubernetes.
+platform = {
+  contract_version = 1
+  aws_region = "us-east-1"
+  vpc_id = "vpc-0123456789abcdef0"
+  private_subnet_ids = ["subnet-0123456789abcdef0", "subnet-0123456789abcdef1"]
+  lambda_security_group_ids = {
+    staging = "sg-0123456789abcdef0"
+    producao = "sg-0123456789abcdef1"
+  }
+}
+# Copiar os valores reais do output database do infra-database.
+database = {
+  contract_version = 1
+  aws_region = "us-east-1"
+  vpc_id = "vpc-0123456789abcdef0"
+  address = "oficina.EXEMPLO.us-east-1.rds.amazonaws.com"
+  port = 5432
+  planned_environments = {
+    staging = {
+      branch = "develop"
+      database_name = "oficina_staging"
+      auth_role = "oficina_staging_auth"
+    }
+    producao = {
+      branch = "master"
+      database_name = "oficina_producao"
+      auth_role = "oficina_producao_auth"
+    }
+  }
+}

@@ -1,5 +1,5 @@
 variable "project_name" {
-  description = "Prefixo dos nomes planejados para as funcoes."
+  description = "Prefixo dos nomes da autenticacao na AWS."
   type        = string
   default     = "oficina"
 

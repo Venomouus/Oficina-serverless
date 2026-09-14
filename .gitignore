@@ -13,8 +13,11 @@ artifacts/
 !.env.example
 config/*.local.json
 *.pem
+!src/Oficina.Autenticacao/certificates/rds-global-bundle.pem
 *.key
 .terraform/
+backend.hcl
+*.backend.hcl
 *.tfstate
 *.tfstate.*
 *.tfplan
