@@ -13,9 +13,9 @@ Autenticacao por CPF com PostgreSQL e JWT RS256, host local de testes e infraest
 - 72 testes .NET, incluindo PostgreSQL real descartavel, e 11 testes Terraform com AWS simulada.
 - CI gera ZIP linux-x64 incluindo o bundle publico de CA do RDS e o SDK Secrets Manager.
 
-**Nenhum recurso AWS foi provisionado nesta etapa.** A CI valida e empacota; mantenha `DEPLOY_ENABLED=false`. O fluxo local de emissao JWT e autorizacao por cliente na API principal ja foi integrado e testado.
+Lambda de autenticacao publicada no Academy. CPF/JWT e consulta real ao RDS demonstrados em homologacao. O modo academy_role_arn reutiliza LabRole; conta normal preserva a role especifica. Notificacoes externas permanecem pendentes.
 
-Ainda faltam provisionamento, bootstrap dos bancos/roles/valores dos segredos, Gateway HTTPS e authorizer, publicacao da API no EKS, CD, notificacoes e observabilidade distribuida. A rotacao RSA com coexistencia de chaves JWKS tambem permanece pendente.
+O workflow `academy-deploy.yml` faz deploy de develop/master no runner Windows autorizado (label academy). Requer PC/Docker ativos e credenciais temporarias Academy validas. O codigo compartilhado de deploy fica em [Oficina-Mecanica/academy](https://github.com/Venomouus/Oficina-Mecanica/tree/master/academy). Evidencias e limites finais estao no [pacote de entrega](https://github.com/Venomouus/Oficina-Mecanica/tree/master/docs/entrega).
 
 ## Executar localmente
 

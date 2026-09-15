@@ -32,7 +32,8 @@ resource "aws_cloudwatch_log_group" "authentication" {
 }
 
 resource "aws_iam_role" "authentication" {
-  name = local.function_name
+  count = var.academy_role_arn == null ? 1 : 0
+  name  = local.function_name
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -44,8 +45,9 @@ resource "aws_iam_role" "authentication" {
 }
 
 resource "aws_iam_role_policy" "authentication" {
-  name = "runtime"
-  role = aws_iam_role.authentication.id
+  count = var.academy_role_arn == null ? 1 : 0
+  name  = "runtime"
+  role  = aws_iam_role.authentication[0].id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -89,7 +91,7 @@ resource "aws_iam_role_policy" "authentication" {
 resource "aws_lambda_function" "authentication" {
   function_name                  = local.function_name
   description                    = "Autenticacao CPF/JWT - ${var.environment}"
-  role                           = aws_iam_role.authentication.arn
+  role                           = var.academy_role_arn != null ? var.academy_role_arn : aws_iam_role.authentication[0].arn
   runtime                        = "dotnet8"
   architectures                  = ["x86_64"]
   handler                        = "Oficina.Autenticacao::Oficina.Autenticacao.Function::FunctionHandler"
