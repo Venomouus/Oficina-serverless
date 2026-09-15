@@ -104,11 +104,11 @@ run "private_lambda_and_own_secrets" {
   }
   assert {
     condition = (
-      toset(jsondecode(aws_iam_role_policy.authentication.policy).Statement[0].Action) == toset(["secretsmanager:GetSecretValue"]) &&
-      toset(jsondecode(aws_iam_role_policy.authentication.policy).Statement[0].Resource) == toset([
+      toset(jsondecode(aws_iam_role_policy.authentication[0].policy).Statement[0].Action) == toset(["secretsmanager:GetSecretValue"]) &&
+      toset(jsondecode(aws_iam_role_policy.authentication[0].policy).Statement[0].Resource) == toset([
       aws_secretsmanager_secret.authentication["database"].arn, aws_secretsmanager_secret.authentication["jwt"].arn]) &&
-      jsondecode(aws_iam_role_policy.authentication.policy).Statement[3].Effect == "Deny" &&
-      jsondecode(aws_iam_role_policy.authentication.policy).Statement[3].Condition.ArnEquals["lambda:SourceFunctionArn"] == local.function_arn
+      jsondecode(aws_iam_role_policy.authentication[0].policy).Statement[3].Effect == "Deny" &&
+      jsondecode(aws_iam_role_policy.authentication[0].policy).Statement[3].Condition.ArnEquals["lambda:SourceFunctionArn"] == local.function_arn
     )
     error_message = "IAM deve limitar leitura aos segredos proprios e negar mutacao de ENI pelo codigo."
   }
