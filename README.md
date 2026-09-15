@@ -98,3 +98,17 @@ Checks: `build-test` e `validate-terraform`. Fluxo: feature → develop → mast
 O infra-kubernetes continua responsavel pelo Gateway e suas integracoes. Este repositorio fornece alias ARN/invoke ARN e configura permissao somente quando receber o execution ARN especifico da API. Ainda nao ha URL AWS ativa.
 
 Referencias do projeto: [contratos HTTP](docs/contratos.md), [OpenAPI](docs/openapi.yaml), [operacao Terraform](infra/README.md), [ADR AWS](docs/adrs/002-lambda-secrets-manager.md).
+
+## Diagrama da autenticacao
+
+```mermaid
+flowchart LR
+    Cliente --> GW[API Gateway HTTPS]
+    GW --> Lambda[Lambda CPF]
+    Lambda --> DB[(RDS - consulta de cliente ativo)]
+    SM[Secrets Manager - credencial e chave JWT] --> Lambda
+    Lambda --> JWT[JWT RS256 e JWKS]
+    JWT --> Cliente
+```
+
+[Postman da integracao AWS](https://github.com/Venomouus/Oficina-Mecanica/blob/master/docs/entrega/Oficina-AWS.postman_collection.json).
