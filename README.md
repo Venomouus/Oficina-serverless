@@ -13,9 +13,9 @@ Autenticacao por CPF com PostgreSQL e JWT RS256, host local de testes e infraest
 - 72 testes .NET, incluindo PostgreSQL real descartavel, e 11 testes Terraform com AWS simulada.
 - CI gera ZIP linux-x64 incluindo o bundle publico de CA do RDS e o SDK Secrets Manager.
 
-**Nenhum recurso AWS foi provisionado nesta etapa.** A CI valida e empacota; mantenha `DEPLOY_ENABLED=false`. O fluxo local de emissao JWT e autorizacao por cliente na API principal ja foi integrado e testado.
+Lambda de autenticacao publicada no Academy. CPF/JWT e consulta real ao RDS demonstrados em homologacao. O modo academy_role_arn reutiliza LabRole; conta normal preserva a role especifica. Notificacoes externas permanecem pendentes.
 
-Ainda faltam provisionamento, bootstrap dos bancos/roles/valores dos segredos, Gateway HTTPS e authorizer, publicacao da API no EKS, CD, notificacoes e observabilidade distribuida. A rotacao RSA com coexistencia de chaves JWKS tambem permanece pendente.
+O workflow `academy-deploy.yml` faz deploy de develop/master no runner Windows autorizado (label academy). Requer PC/Docker ativos e credenciais temporarias Academy validas. O codigo compartilhado de deploy fica em [Oficina-Mecanica/academy](https://github.com/Venomouus/Oficina-Mecanica/tree/master/academy). Evidencias e limites finais estao no [pacote de entrega](https://github.com/Venomouus/Oficina-Mecanica/tree/master/docs/entrega).
 
 ## Executar localmente
 
@@ -98,3 +98,17 @@ Checks: `build-test` e `validate-terraform`. Fluxo: feature → develop → mast
 O infra-kubernetes continua responsavel pelo Gateway e suas integracoes. Este repositorio fornece alias ARN/invoke ARN e configura permissao somente quando receber o execution ARN especifico da API. Ainda nao ha URL AWS ativa.
 
 Referencias do projeto: [contratos HTTP](docs/contratos.md), [OpenAPI](docs/openapi.yaml), [operacao Terraform](infra/README.md), [ADR AWS](docs/adrs/002-lambda-secrets-manager.md).
+
+## Diagrama da autenticacao
+
+```mermaid
+flowchart LR
+    Cliente --> GW[API Gateway HTTPS]
+    GW --> Lambda[Lambda CPF]
+    Lambda --> DB[(RDS - consulta de cliente ativo)]
+    SM[Secrets Manager - credencial e chave JWT] --> Lambda
+    Lambda --> JWT[JWT RS256 e JWKS]
+    JWT --> Cliente
+```
+
+[Postman da integracao AWS](https://github.com/Venomouus/Oficina-Mecanica/blob/master/docs/entrega/Oficina-AWS.postman_collection.json).
